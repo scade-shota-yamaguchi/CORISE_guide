@@ -740,22 +740,25 @@ var VIDEOS = {
     // ---- サムネイル表示（失敗時はグレーのまま） ----
     var thumb = new Image();
     thumb.onload = function () {
-      // YouTubeのmaxresが無い場合は120x90のダミーが返るため除外
-      if (thumb.naturalWidth <= 120) return;
       box.style.backgroundImage = 'url("' + thumb.src + '")';
       slot.classList.add('vs-thumb');
     };
     if (isYouTube) {
-      // 最高画質→無ければ標準画質にフォールバック
-      thumb.onerror = function () {
-        thumb.onerror = null;
-        thumb.onload = function () {
-          box.style.backgroundImage = 'url("' + thumb.src + '")';
-          slot.classList.add('vs-thumb');
-        };
-        thumb.src = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+      // 高画質から順に試す。maxres未生成時はYouTubeが120x90の
+      // ダミー画像を「正常応答」として返すため、サイズでも判定して次へ進む
+      var candidates = ['maxresdefault', 'sddefault', 'hqdefault'];
+      var ci = 0;
+      var tryNext = function () {
+        if (ci >= candidates.length) return; // 全滅ならグレーのまま
+        thumb.src = 'https://i.ytimg.com/vi/' + id + '/' + candidates[ci++] + '.jpg';
       };
-      thumb.src = 'https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg';
+      thumb.onload = function () {
+        if (thumb.naturalWidth <= 120) { tryNext(); return; } // ダミー→次の画質へ
+        box.style.backgroundImage = 'url("' + thumb.src + '")';
+        slot.classList.add('vs-thumb');
+      };
+      thumb.onerror = tryNext;
+      tryNext();
     } else {
       var w = Math.min(2560, Math.ceil((slot.clientWidth || 960) * (window.devicePixelRatio || 1)));
       thumb.src = 'https://drive.google.com/thumbnail?id=' + id + '&sz=w' + w;
